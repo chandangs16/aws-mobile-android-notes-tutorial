@@ -26,6 +26,8 @@ import android.widget.EditText;
 
 import com.amazonaws.mobile.samples.mynotes.data.Note;
 import com.amazonaws.mobile.samples.mynotes.data.NotesContentContract;
+import com.amazonaws.mobileconnectors.pinpoint.analytics.AnalyticsClient;
+import com.amazonaws.mobileconnectors.pinpoint.analytics.AnalyticsEvent;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -132,7 +134,7 @@ public class NoteDetailFragment extends Fragment {
      */
     private void saveData() {
         // Save the edited text back to the item.
-        boolean isUpdated = false;
+        /*boolean isUpdated = false;
         if (!mItem.getTitle().equals(editTitle.getText().toString().trim())) {
             mItem.setTitle(editTitle.getText().toString().trim());
             mItem.setUpdated(DateTime.now(DateTimeZone.UTC));
@@ -154,7 +156,40 @@ public class NoteDetailFragment extends Fragment {
                 isUpdate = true;    // Anything from now on is an update
                 itemUri = NotesContentContract.Notes.uriBuilder(mItem.getNoteId());
             }
+        }*/
+
+        boolean isUpdated = false;
+        if (!mItem.getTitle().equals(editTitle.getText().toString().trim())) {
+            mItem.setTitle(editTitle.getText().toString().trim());
+            mItem.setUpdated(DateTime.now(DateTimeZone.UTC));
+            isUpdated = true;
         }
+        if (!mItem.getContent().equals(editContent.getText().toString().trim())) {
+            mItem.setContent(editContent.getText().toString().trim());
+            mItem.setUpdated(DateTime.now(DateTimeZone.UTC));
+            isUpdated = true;
+        }
+
+        // Convert to ContentValues and store in the database.
+        if (isUpdated) {
+            ContentValues values = mItem.toContentValues();
+            if (isUpdate) {
+                contentResolver.update(itemUri, values, null, null);
+            } else {
+                itemUri = contentResolver.insert(NotesContentContract.Notes.CONTENT_URI, values);
+                isUpdate = true;    // Anything from now on is an update
+
+                // Send Custom Event to Amazon Pinpoint
+                final AnalyticsClient mgr = AWSProvider.getInstance()
+                        .getPinpointManager()
+                        .getAnalyticsClient();
+                final AnalyticsEvent evt = mgr.createEvent("AddNote")
+                        .withAttribute("noteId", mItem.getNoteId());
+                mgr.recordEvent(evt);
+                mgr.submitEvents();
+            }
+        }
+
     }
 
     /**
